@@ -1,5 +1,5 @@
 <?php
-require_once 'conexion.php';
+require_once '../config/conexion.php';
 
 $nombre   = 'Recepcionista Principal';
 $correo   = 'admin@clinica.com';

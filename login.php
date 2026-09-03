@@ -1,39 +1,35 @@
 <?php
 session_start();
+require_once __DIR__ . '/config/conexion.php';
 
-// Si ya inició sesión, redirigir al panel
+$error = '';
+
 if (isset($_SESSION['usuario_id'])) {
     header('Location: index.php');
     exit;
 }
 
-$error = '';
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    require_once 'conexion.php';
-
     $correo   = trim($_POST['correo'] ?? '');
     $password = trim($_POST['password'] ?? '');
 
     if (empty($correo) || empty($password)) {
-        $error = 'Por favor completa todos los campos.';
+        $error = 'Por favor ingresa correo y contraseña.';
     } else {
         try {
-            $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE correo = ?");
+            // Seleccionamos la columna password_hash
+            $stmt = $pdo->prepare("SELECT id, nombre, password_hash FROM usuarios WHERE correo = ?");
             $stmt->execute([$correo]);
             $usuario = $stmt->fetch();
 
-            // Verificamos si el usuario existe y la contraseña encriptada coincide
+            // Verificamos el hash con password_verify
             if ($usuario && password_verify($password, $usuario['password_hash'])) {
-                // Guardamos en la sesión
                 $_SESSION['usuario_id']     = $usuario['id'];
                 $_SESSION['usuario_nombre'] = $usuario['nombre'];
-                $_SESSION['usuario_correo'] = $usuario['correo'];
-
                 header('Location: index.php');
                 exit;
             } else {
-                $error = 'Correo o contraseña incorrectos.';
+                $error = 'Credenciales incorrectas.';
             }
         } catch (PDOException $e) {
             $error = 'Error en el servidor: ' . $e->getMessage();
@@ -41,48 +37,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar Sesión - Clínica Psicológica</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #f4f6f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-card { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 350px; }
-        .login-card h2 { margin-top: 0; text-align: center; color: #333; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .btn { width: 100%; padding: 10px; background: #007bff; color: #fff; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
-        .btn:hover { background: #0056b3; }
-        .error { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 14px; text-align: center; }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-
-<div class="login-card">
-    <h2>Iniciar Sesión</h2>
-
-    <?php if (!empty($error)): ?>
-        <div class="error"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
-
-    <form action="login.php" method="POST">
-        <div class="form-group">
-            <label for="correo">Correo Electrónico:</label>
-            <input type="email" id="correo" name="correo" required>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+        <div class="text-center mb-6">
+            <span class="text-4xl">🩺</span>
+            <h1 class="text-2xl font-bold text-slate-800 mt-2">Acceso al Sistema</h1>
+            <p class="text-slate-500 text-sm">Clínica Psicológica</p>
         </div>
 
-        <div class="form-group">
-            <label for="password">Contraseña:</label>
-            <input type="password" id="password" name="password" required>
-        </div>
+        <?php if (!empty($error)): ?>
+            <div class="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg mb-4 text-sm">
+                <?= htmlspecialchars($error) ?>
+            </div>
+        <?php endif; ?>
 
-        <button type="submit" class="btn">Ingresar</button>
-    </form>
-</div>
-
+        <form action="login.php" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Correo Electrónico</label>
+                <input type="email" name="correo" required placeholder="admin@clinica.com"
+                    class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Contraseña</label>
+                <input type="password" name="password" required placeholder="••••••••"
+                    class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg shadow transition-colors">
+                Ingresar
+            </button>
+        </form>
+    </div>
 </body>
 </html>
