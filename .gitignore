@@ -1,1 +1,17 @@
+# Archivo de conexión con credenciales explícitas de BD
 conexion.php
+
+# Variables de entorno y configuraciones locales de seguridad
+.env
+.env.local
+.env.development.local
+
+# Carpetas de dependencias locales (Composer / Node)
+vendor/
+node_modules/
+
+# Archivos temporales de sistema e IDEs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
