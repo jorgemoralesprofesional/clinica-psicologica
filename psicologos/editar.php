@@ -3,80 +3,223 @@ $root_path = '../';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/conexion.php';
 
-$mensaje = '';
-$error   = '';
-
-// 1. Obtenemos y validamos el ID que viene por la URL (método GET)
 $id = $_GET['id'] ?? null;
+$error = '';
+
 if (!$id || !is_numeric($id)) {
-    header('Location: index.php');
+    header("Location: index.php?error=" . urlencode("ID de psicólogo inválido."));
     exit;
 }
 
-// 2. Si el usuario envió el formulario (método POST) procesamos la actualización
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nombre        = trim($_POST['nombre'] ?? '');
-    $especialidad  = trim($_POST['especialidad'] ?? '');
-    $correo        = trim($_POST['correo'] ?? '');
-    $telefono      = trim($_POST['telefono'] ?? '');
+// 1. Obtener los datos del psicólogo
+try {
+    $stmt = $pdo->prepare("SELECT * FROM psicologos WHERE id = ?");
+    $stmt->execute([$id]);
+    $psicologo = $stmt->fetch();
 
-    if (empty($nombre) || empty($especialidad) || empty($correo) || empty($telefono)) {
-        $error = 'Por favor completa todos los campos.';
+    if (!$psicologo) {
+        header("Location: index.php?error=" . urlencode("El psicólogo no existe."));
+        exit;
+    }
+
+    // Obtener las especialidades que ya tiene asignadas este psicólogo (arreglo de IDs)
+    $stmt_esp_psi = $pdo->prepare("SELECT especialidad_id FROM psicologo_especialidad WHERE psicologo_id = ?");
+    $stmt_esp_psi->execute([$id]);
+    $especialidades_asignadas = $stmt_esp_psi->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+} catch (PDOException $e) {
+    $error = "Error al obtener los datos: " . $e->getMessage();
+}
+
+// 2. Obtener la lista general de especialidades de la BD
+try {
+    $query_esp = $pdo->query("SELECT id, nombre FROM especialidades ORDER BY nombre ASC");
+    $lista_especialidades = $query_esp->fetchAll();
+} catch (PDOException $e) {
+    $error = "Error al cargar especialidades: " . $e->getMessage();
+    $lista_especialidades = [];
+}
+
+// Días de la semana para el formulario
+$dias_semana = [
+    1 => 'Lunes', 2 => 'Martes', 3 => 'Miércoles', 
+    4 => 'Jueves', 5 => 'Viernes', 6 => 'Sábado', 7 => 'Domingo'
+];
+
+// Obtener los días laborales que ya tiene asignados este psicólogo
+try {
+    $stmt_dias_psi = $pdo->prepare("SELECT dia_semana FROM horarios_atencion WHERE psicologo_id = ?");
+    $stmt_dias_psi->execute([$id]);
+    $dias_asignados = $stmt_dias_psi->fetchAll(PDO::FETCH_COLUMN) ?: [];
+} catch (PDOException $e) {
+    $dias_asignados = [];
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Datos Básicos
+    $nombre   = trim($_POST['nombre'] ?? '');
+    $correo   = trim($_POST['correo'] ?? '');
+    $telefono = trim($_POST['telefono'] ?? '');
+    $duracion = (int)($_POST['duracion_consulta_minutos'] ?? 45);
+    
+    // Selección Múltiple de Especialidades y Días vía Checkboxes
+    $especialidades_seleccionadas = $_POST['especialidades'] ?? [];
+    $dias_seleccionados           = $_POST['dias'] ?? [];
+
+    if (empty($nombre) || empty($correo) || empty($telefono) || empty($duracion)) {
+        $error = 'Por favor completa todos los datos básicos.';
+    } elseif (empty($especialidades_seleccionadas)) {
+        $error = 'Debes seleccionar al menos una especialidad.';
+    } elseif (empty($dias_seleccionados)) {
+        $error = 'Debes seleccionar al menos un día de atención laboral.';
     } else {
         try {
-            // Usamos un nombre descriptivo en lugar de $stmt
-            $query_actualizar = $pdo->prepare("UPDATE psicologos SET nombre = ?, especialidad = ?, correo = ?, telefono = ? WHERE id = ?");
-            $query_actualizar->execute([$nombre, $especialidad, $correo, $telefono, $id]);
+            // INICIAR TRANSACCIÓN SEGURA
+            $pdo->beginTransaction();
+
+            // 1. Actualizar Datos Principales del Psicólogo
+            $query_psicologo = $pdo->prepare("UPDATE psicologos SET nombre = ?, correo = ?, telefono = ?, duracion_consulta_minutos = ? WHERE id = ?");
+            $query_psicologo->execute([$nombre, $correo, $telefono, $duracion, $id]);
             
-            $mensaje = '✅ Psicólogo actualizado con éxito.';
+            // 2. Sincronizar Especialidades (Borrar anteriores e insertar las nuevas)
+            $stmt_del_esp = $pdo->prepare("DELETE FROM psicologo_especialidad WHERE psicologo_id = ?");
+            $stmt_del_esp->execute([$id]);
+
+            $query_pivot_esp = $pdo->prepare("INSERT INTO psicologo_especialidad (psicologo_id, especialidad_id) VALUES (?, ?)");
+            foreach ($especialidades_seleccionadas as $esp_id) {
+                $query_pivot_esp->execute([$id, (int)$esp_id]);
+            }
+
+            // 3. Sincronizar Horarios de Atención (Borrar anteriores e insertar los nuevos)
+            $stmt_del_horarios = $pdo->prepare("DELETE FROM horarios_atencion WHERE psicologo_id = ?");
+            $stmt_del_horarios->execute([$id]);
+
+            $query_horarios = $pdo->prepare("INSERT INTO horarios_atencion (psicologo_id, dia_semana, hora_inicio, hora_fin) VALUES (?, ?, '08:00:00', '16:00:00')");
+            foreach ($dias_seleccionados as $dia) {
+                $query_horarios->execute([$id, (int)$dia]);
+            }
+
+            // Confirmar transacción
+            $pdo->commit();
+            
+            $mensaje = 'Psicólogo actualizado con éxito.';
+            header("Location: index.php?mensaje=" . urlencode($mensaje));
+            exit;
+            
         } catch (PDOException $e) {
-            $error = 'Error en la base de datos: ' . $e->getMessage();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            if ($e->getCode() == 23000) {
+                $error = 'El correo electrónico ya está registrado para otro profesional.';
+            } else {
+                $error = 'Error en la base de datos: ' . $e->getMessage();
+            }
         }
     }
 }
 
-// 3. Consultamos los datos actuales del psicólogo para rellenar el formulario
-$query_buscar = $pdo->prepare("SELECT * FROM psicologos WHERE id = ?");
-$query_buscar->execute([$id]);
-$psicologo = $query_buscar->fetch();
-
-// Si el ID no existe en la base de datos, redirigimos al listado
-if (!$psicologo) {
-    header('Location: index.php');
-    exit;
-}
-
-$title = 'Editar Psicólogo';
+$title = 'Editar Psicólogo - Clínica';
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<div class="max-w-md mx-auto bg-white rounded-xl shadow-md p-8">
-    <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-bold text-slate-800">Editar Psicólogo</h2>
-        <a href="index.php" class="text-sm text-blue-600 hover:underline">← Volver</a>
+<div class="max-w-3xl mx-auto bg-white rounded-xl shadow-md p-8 border border-slate-100 my-8">
+    <div class="flex items-center justify-between mb-6 border-b pb-4">
+        <h2 class="text-2xl font-bold text-slate-800">Editar Datos del Psicólogo</h2>
+        <a href="index.php" class="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">← Volver al Listado</a>
     </div>
+    
+    <?php if ($error): ?>
+        <div class="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg mb-6 text-sm">
+            <?= htmlspecialchars($error) ?>
+        </div>
+    <?php endif; ?>
 
-    <?php if ($mensaje): ?><div class="bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg mb-4 text-sm"><?= $mensaje ?></div><?php endif; ?>
-    <?php if ($error): ?><div class="bg-rose-50 text-rose-700 px-4 py-3 rounded-lg mb-4 text-sm"><?= $error ?></div><?php endif; ?>
+    <form method="POST" class="space-y-8">
+        <div>
+            <h3 class="text-lg font-semibold text-slate-700 mb-4">1. Datos Personales</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Nombre Completo *</label>
+                    <input type="text" name="nombre" value="<?= htmlspecialchars($_POST['nombre'] ?? $psicologo['nombre'] ?? '') ?>" required class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Correo Electrónico *</label>
+                    <input type="email" name="correo" value="<?= htmlspecialchars($_POST['correo'] ?? $psicologo['correo'] ?? '') ?>" required class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Teléfono *</label>
+                    <input type="text" name="telefono" value="<?= htmlspecialchars($_POST['telefono'] ?? $psicologo['telefono'] ?? '') ?>" required placeholder="+58 412 1234567" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+        </div>
 
-    <form method="POST" class="space-y-4">
-        <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1">Nombre Completo</label>
-            <input type="text" name="nombre" value="<?= htmlspecialchars($psicologo['nombre']) ?>" required class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        <div class="pt-4 border-t border-slate-100">
+            <h3 class="text-lg font-semibold text-slate-700 mb-4">2. Perfil Profesional</h3>
+            
+            <div class="mb-5">
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Duración por Consulta *</label>
+                <?php $duracion_actual = $_POST['duracion_consulta_minutos'] ?? $psicologo['duracion_consulta_minutos'] ?? '45'; ?>
+                <select name="duracion_consulta_minutos" required class="w-full md:w-1/2 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="30" <?= ($duracion_actual == '30') ? 'selected' : '' ?>>30 Minutos</option>
+                    <option value="45" <?= ($duracion_actual == '45') ? 'selected' : '' ?>>45 Minutos</option>
+                    <option value="60" <?= ($duracion_actual == '60') ? 'selected' : '' ?>>60 Minutos (1 Hora)</option>
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Especialidades *</label>
+                <p class="text-xs text-slate-500 mb-3">Marca las especialidades correspondientes para este profesional.</p>
+                
+                <?php if (empty($lista_especialidades)): ?>
+                    <p class="text-sm text-rose-600 bg-rose-50 p-3 rounded border border-rose-100">No hay especialidades registradas en la base de datos.</p>
+                <?php else: ?>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200 max-h-48 overflow-y-auto">
+                        <?php foreach ($lista_especialidades as $esp): ?>
+                            <?php 
+                                // Determina si debe estar marcado (si hay errores en POST usa el POST, sino carga los de la BD)
+                                $marcado = isset($_POST['especialidades']) 
+                                    ? in_array($esp['id'], $_POST['especialidades']) 
+                                    : in_array($esp['id'], $especialidades_asignadas);
+                            ?>
+                            <label class="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer">
+                                <input type="checkbox" name="especialidades[]" value="<?= $esp['id'] ?>" 
+                                    <?= $marcado ? 'checked' : '' ?>
+                                    class="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500">
+                                <span><?= htmlspecialchars($esp['nombre']) ?></span>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
         </div>
-        <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1">Especialidad</label>
-            <input type="text" name="especialidad" value="<?= htmlspecialchars($psicologo['especialidad']) ?>" required class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+
+        <div class="pt-4 border-t border-slate-100">
+            <h3 class="text-lg font-semibold text-slate-700 mb-1">3. Días Laborables</h3>
+            <p class="text-xs text-slate-500 mb-4">Selecciona los días en los que el profesional atenderá consultas.</p>
+            
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <?php foreach ($dias_semana as $num => $dia): ?>
+                    <?php 
+                        $marcado_dia = isset($_POST['dias']) 
+                            ? in_array($num, $_POST['dias']) 
+                            : in_array($num, $dias_asignados);
+                    ?>
+                    <label class="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer">
+                        <input type="checkbox" name="dias[]" value="<?= $num ?>" 
+                            <?= $marcado_dia ? 'checked' : '' ?>
+                            class="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500">
+                        <span><?= $dia ?></span>
+                    </label>
+                <?php endforeach; ?>
+            </div>
         </div>
-        <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1">Correo Electrónico</label>
-            <input type="email" name="correo" value="<?= htmlspecialchars($psicologo['correo']) ?>" required class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+
+        <div class="pt-6">
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow-md transition-colors duration-200 text-sm">
+                Guardar Cambios del Psicólogo
+            </button>
         </div>
-        <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1">Teléfono</label>
-            <input type="text" name="telefono" value="<?= htmlspecialchars($psicologo['telefono']) ?>" required class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm">
-        </div>
-        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg text-sm shadow">Actualizar Cambios</button>
     </form>
 </div>
 
