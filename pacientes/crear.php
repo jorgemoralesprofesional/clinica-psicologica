@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tipo_doc  = trim($_POST['tipo_doc'] ?? 'V');
     $num_doc   = trim($_POST['num_doc'] ?? '');
     $documento_identidad = !empty($num_doc) ? $tipo_doc . '-' . $num_doc : '';
-    
+
     $nombre           = trim($_POST['nombre'] ?? '');
     $correo           = trim($_POST['correo'] ?? '');
     $telefono         = trim($_POST['telefono'] ?? '');
@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sql_paciente = "INSERT INTO pacientes (documento_identidad, nombre, correo, telefono, fecha_nacimiento) VALUES (?, ?, ?, ?, ?)";
                 $stmt_paciente = $pdo->prepare($sql_paciente);
                 $stmt_paciente->execute([$documento_identidad, $nombre, $correo, $telefono, $fecha_nacimiento]);
-                
+
                 $paciente_id = $pdo->lastInsertId();
 
                 // 2. Insertar Cita Asociada Inmediatamente (incluyendo especialidad_id)
@@ -70,8 +70,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Confirmar transacción
                 $pdo->commit();
 
-                // Redirigir al index principal para ver la tabla actualizada
-                header('Location: ../index.php');
+                // Redirigir enviando el mensaje para activar el Toast en index.php
+                $mensaje = "Paciente y cita inicial registrados con éxito.";
+                header("Location: index.php?mensaje=" . urlencode($mensaje));
                 exit;
             }
         } catch (PDOException $e) {
@@ -152,7 +153,7 @@ require_once __DIR__ . '/../includes/header.php';
 
         <div class="bg-slate-50 p-5 rounded-lg border border-slate-200 space-y-4">
             <h3 class="text-md font-semibold text-slate-700">2. Detalles de la Cita Inicial</h3>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label for="psicologo_id" class="block text-sm font-semibold text-slate-700 mb-1">Psicólogo Asignado *</label>
@@ -202,7 +203,7 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
-        <button type="submit" 
+        <button type="submit"
             class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg shadow transition-all">
             Guardar Paciente y Agendar Cita
         </button>
@@ -210,46 +211,46 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const psicologoSelect = document.getElementById('psicologo_id');
-    const fechaInput = document.getElementById('fecha_cita');
-    const horaSelect = document.getElementById('hora_inicio');
+    document.addEventListener('DOMContentLoaded', function() {
+        const psicologoSelect = document.getElementById('psicologo_id');
+        const fechaInput = document.getElementById('fecha_cita');
+        const horaSelect = document.getElementById('hora_inicio');
 
-    function actualizarHoras() {
-        const psicologoId = psicologoSelect.value;
-        const fecha = fechaInput.value;
+        function actualizarHoras() {
+            const psicologoId = psicologoSelect.value;
+            const fecha = fechaInput.value;
 
-        if (!psicologoId || !fecha) {
-            horaSelect.innerHTML = '<option value="">Primero seleccione psicólogo y fecha...</option>';
-            return;
+            if (!psicologoId || !fecha) {
+                horaSelect.innerHTML = '<option value="">Primero seleccione psicólogo y fecha...</option>';
+                return;
+            }
+
+            horaSelect.innerHTML = '<option value="">Cargando horarios...</option>';
+
+            fetch(`../api/obtener_horas.php?psicologo_id=${psicologoId}&fecha=${fecha}`)
+                .then(response => response.json())
+                .then(data => {
+                    horaSelect.innerHTML = '<option value="">Seleccione un horario disponible...</option>';
+                    if (data.length === 0) {
+                        horaSelect.innerHTML = '<option value="">No hay horarios disponibles para esta fecha</option>';
+                        return;
+                    }
+                    data.forEach(bloque => {
+                        const option = document.createElement('option');
+                        option.value = bloque.inicio;
+                        option.textContent = bloque.etiqueta;
+                        horaSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    horaSelect.innerHTML = '<option value="">Error al cargar horarios</option>';
+                });
         }
 
-        horaSelect.innerHTML = '<option value="">Cargando horarios...</option>';
-
-        fetch(`../api/obtener_horas.php?psicologo_id=${psicologoId}&fecha=${fecha}`)
-            .then(response => response.json())
-            .then(data => {
-                horaSelect.innerHTML = '<option value="">Seleccione un horario disponible...</option>';
-                if (data.length === 0) {
-                    horaSelect.innerHTML = '<option value="">No hay horarios disponibles para esta fecha</option>';
-                    return;
-                }
-                data.forEach(bloque => {
-                    const option = document.createElement('option');
-                    option.value = bloque.inicio;
-                    option.textContent = bloque.etiqueta;
-                    horaSelect.appendChild(option);
-                });
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                horaSelect.innerHTML = '<option value="">Error al cargar horarios</option>';
-            });
-    }
-
-    psicologoSelect.addEventListener('change', actualizarHoras);
-    fechaInput.addEventListener('change', actualizarHoras);
-});
+        psicologoSelect.addEventListener('change', actualizarHoras);
+        fechaInput.addEventListener('change', actualizarHoras);
+    });
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

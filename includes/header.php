@@ -17,6 +17,8 @@ require_once __DIR__ . '/auth.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? 'Clínica Psicológica' ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SweetAlert2 CSS y JS desde CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body class="h-full flex flex-col bg-slate-100 font-sans text-slate-800">
@@ -24,7 +26,7 @@ require_once __DIR__ . '/auth.php';
     <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
-                
+
                 <!-- Logo -->
                 <div class="flex items-center gap-3">
                     <span class="text-2xl">🩺</span>
@@ -105,16 +107,16 @@ require_once __DIR__ . '/auth.php';
     </header>
 
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const btnMenu = document.getElementById('btn-menu-movil');
-        const menuMovil = document.getElementById('menu-movil');
+        document.addEventListener('DOMContentLoaded', function() {
+            const btnMenu = document.getElementById('btn-menu-movil');
+            const menuMovil = document.getElementById('menu-movil');
 
-        if (btnMenu && menuMovil) {
-            btnMenu.addEventListener('click', function() {
-                menuMovil.classList.toggle('hidden');
-            });
-        }
-    });
+            if (btnMenu && menuMovil) {
+                btnMenu.addEventListener('click', function() {
+                    menuMovil.classList.toggle('hidden');
+                });
+            }
+        });
     </script>
 
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">

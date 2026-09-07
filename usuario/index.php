@@ -3,45 +3,46 @@ $root_path = '../';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/conexion.php';
 
-// Bloqueo de seguridad: Solo el rol 'admin' puede acceder a este panel[cite: 1]
 if (!esAdmin()) {
     header('Location: ../index.php');
     exit;
 }
 
-$mensaje = '';
-$error = '';
-
-// Acciones: Cambiar Estado (Bloquear/Activar) o Eliminar
+// Lógica de acciones
 if (isset($_GET['accion'], $_GET['id'])) {
     $id_usuario = (int)$_GET['id'];
     $accion = $_GET['accion'];
 
-    // Evitar que el administrador se elimine o bloquee a sí mismo
     if ($id_usuario === (int)$_SESSION['usuario_id']) {
-        $error = 'No puedes modificar ni eliminar tu propia cuenta de administrador.';
+        header("Location: index.php?error=" . urlencode('No puedes modificar ni eliminar tu propia cuenta.'));
+        exit;
     } else {
         try {
             if ($accion === 'bloquear') {
                 $stmt = $pdo->prepare("UPDATE usuarios SET estado = 'bloqueado' WHERE id = ?");
                 $stmt->execute([$id_usuario]);
-                $mensaje = 'Usuario bloqueado correctamente.';
+                $msg = 'Usuario bloqueado correctamente.';
             } elseif ($accion === 'activar') {
                 $stmt = $pdo->prepare("UPDATE usuarios SET estado = 'activo' WHERE id = ?");
                 $stmt->execute([$id_usuario]);
-                $mensaje = 'Usuario activado correctamente.';
+                $msg = 'Usuario activado correctamente.';
             } elseif ($accion === 'eliminar') {
                 $stmt = $pdo->prepare("DELETE FROM usuarios WHERE id = ?");
                 $stmt->execute([$id_usuario]);
-                $mensaje = 'Usuario eliminado permanentemente.';
+                $msg = 'Usuario eliminado permanentemente.';
             }
+            header("Location: index.php?mensaje=" . urlencode($msg));
+            exit;
         } catch (PDOException $e) {
-            $error = 'Error al procesar la acción: ' . $e->getMessage();
+            header("Location: index.php?error=" . urlencode('Error al procesar la acción: ' . $e->getMessage()));
+            exit;
         }
     }
 }
 
-// Obtener la lista de todos los usuarios
+$mensaje = $_GET['mensaje'] ?? '';
+$error   = $_GET['error'] ?? '';
+
 try {
     $stmt = $pdo->query("SELECT id, nombre, correo, rol, estado FROM usuarios ORDER BY id DESC");
     $usuarios = $stmt->fetchAll();
@@ -65,18 +66,6 @@ require_once __DIR__ . '/../includes/header.php';
             </a>
         </div>
     </div>
-
-    <?php if (!empty($mensaje)): ?>
-        <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg mb-6 text-sm">
-            <?= htmlspecialchars($mensaje) ?>
-        </div>
-    <?php endif; ?>
-
-    <?php if (!empty($error)): ?>
-        <div class="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg mb-6 text-sm">
-            <?= htmlspecialchars($error) ?>
-        </div>
-    <?php endif; ?>
 
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="overflow-x-auto">
@@ -121,7 +110,11 @@ require_once __DIR__ . '/../includes/header.php';
                                         <?php else: ?>
                                             <a href="index.php?accion=activar&id=<?= $usr['id'] ?>" class="text-emerald-600 hover:text-emerald-800 font-medium text-xs">Activar</a>
                                         <?php endif; ?>
-                                        <a href="index.php?accion=eliminar&id=<?= $usr['id'] ?>" onclick="return confirm('¿Estás seguro de eliminar este usuario?');" class="text-rose-600 hover:text-rose-800 font-medium text-xs">Eliminar</a>
+                                        <button type="button" 
+                                                onclick="confirmarEliminacion('index.php?accion=eliminar&id=<?= $usr['id'] ?>', '<?= htmlspecialchars($usr['nombre']) ?>')" 
+                                                class="text-rose-600 hover:text-rose-800 font-medium text-xs">
+                                            Eliminar
+                                        </button>
                                     <?php else: ?>
                                         <span class="text-slate-400 text-xs italic">Cuenta actual</span>
                                     <?php endif; ?>
@@ -134,5 +127,52 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
+
+<script>
+// Función reusable para confirmación de eliminación con SweetAlert2
+function confirmarEliminacion(urlEliminar, nombreRegistro) {
+    Swal.fire({
+        title: '¿Estás seguro?',
+        text: `Vas a eliminar a "${nombreRegistro}". Esta acción no se puede deshacer.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            popup: 'rounded-xl shadow-xl border border-slate-100'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = urlEliminar;
+        }
+    });
+}
+
+// Alertas flotantes (Toast) para respuestas del servidor (mensajes de éxito / error)
+document.addEventListener('DOMContentLoaded', function() {
+    <?php if (!empty($mensaje)): ?>
+        Swal.fire({
+            icon: 'success',
+            title: '¡Operación Exitosa!',
+            text: '<?= htmlspecialchars($mensaje) ?>',
+            timer: 3000,
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
+        });
+    <?php endif; ?>
+
+    <?php if (!empty($error)): ?>
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: '<?= htmlspecialchars($error) ?>',
+            confirmButtonColor: '#2563eb'
+        });
+    <?php endif; ?>
+});
+</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

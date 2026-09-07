@@ -42,18 +42,6 @@ require_once __DIR__ . '/../includes/header.php';
         <a href="../index.php" class="text-xs font-semibold text-blue-600 hover:underline">← Volver al Panel Principal</a>
     </div>
 
-    <!-- Mensajes de Alerta -->
-    <?php if (!empty($mensaje)): ?>
-        <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm font-medium">
-            <?= htmlspecialchars($mensaje) ?>
-        </div>
-    <?php endif; ?>
-    <?php if (!empty($error)): ?>
-        <div class="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg text-sm font-medium">
-            <?= htmlspecialchars($error) ?>
-        </div>
-    <?php endif; ?>
-
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 
         <!-- Formulario (Crear o Editar) -->
@@ -122,9 +110,13 @@ require_once __DIR__ . '/../includes/header.php';
                                     </td>
                                     <td class="p-3 text-right space-x-2">
                                         <a href="index.php?editar=<?= $esp['id'] ?>" class="text-blue-600 hover:text-blue-800 font-semibold">Editar</a>
-                                        <a href="eliminar.php?id=<?= $esp['id'] ?>" 
-                                           onclick="return confirm('¿Estás seguro de eliminar esta especialidad?');" 
-                                           class="text-rose-600 hover:text-rose-800 font-semibold">Eliminar</a>
+                                        
+                                        <!-- Enlace modificado con SweetAlert2 -->
+                                        <button type="button" 
+                                                onclick="confirmarEliminacion('eliminar.php?id=<?= $esp['id'] ?>', '<?= htmlspecialchars($esp['nombre']) ?>')" 
+                                                class="text-rose-600 hover:text-rose-800 font-semibold">
+                                            Eliminar
+                                        </button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -137,5 +129,52 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 
 </div>
+
+<script>
+// Función reusable para confirmación de eliminación con SweetAlert2
+function confirmarEliminacion(urlEliminar, nombreRegistro) {
+    Swal.fire({
+        title: '¿Estás seguro?',
+        text: `Vas a eliminar "${nombreRegistro}". Esta acción no se puede deshacer.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            popup: 'rounded-xl shadow-xl border border-slate-100'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = urlEliminar;
+        }
+    });
+}
+
+// Alertas flotantes (Toast) para respuestas del servidor (mensajes de éxito / error)
+document.addEventListener('DOMContentLoaded', function() {
+    <?php if (!empty($mensaje)): ?>
+        Swal.fire({
+            icon: 'success',
+            title: '¡Operación Exitosa!',
+            text: '<?= htmlspecialchars($mensaje) ?>',
+            timer: 3000,
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
+        });
+    <?php endif; ?>
+
+    <?php if (!empty($error)): ?>
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: '<?= htmlspecialchars($error) ?>',
+            confirmButtonColor: '#2563eb'
+        });
+    <?php endif; ?>
+});
+</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
