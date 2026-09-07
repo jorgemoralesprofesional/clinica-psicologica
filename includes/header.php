@@ -46,6 +46,11 @@ $root_path = $root_path ?? './';
                         Psicólogos
                     </a>
 
+                    <!-- NUEVO ENLACE AGREGADO -->
+                    <a href="<?= $root_path ?>especialidades/index.php" class="text-sm font-medium text-slate-600 hover:text-blue-600">
+                        Especialidades
+                    </a>
+
                     <!-- Enlace visible ÚNICAMENTE si es Administrador -->
                     <?php if (function_exists('esAdmin') && esAdmin()): ?>
                         <a href="<?= $root_path ?>usuario/index.php" class="px-3 py-1.5 rounded-lg text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition">
