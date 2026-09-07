@@ -8,14 +8,18 @@ $id = $_GET['id'] ?? null;
 
 if ($id && is_numeric($id)) {
     try {
-        // Usamos un nombre descriptivo en lugar de $stmt
         $query_eliminar = $pdo->prepare("DELETE FROM pacientes WHERE id = ?");
         $query_eliminar->execute([$id]);
-    } catch (PDOException $e) {
-        // En un entorno real podrías loguear el error o manejar restricciones de llaves foráneas
-    }
-}
 
-// 2. Redireccionamos de vuelta al listado principal de forma imperativa
-header('Location: index.php');
-exit;
+        $mensaje = "Paciente eliminado correctamente.";
+        header("Location: index.php?mensaje=" . urlencode($mensaje));
+        exit;
+    } catch (PDOException $e) {
+        $error = "No se pudo eliminar el paciente: " . $e->getMessage();
+        header("Location: index.php?error=" . urlencode($error));
+        exit;
+    }
+} else {
+    header('Location: index.php');
+    exit;
+}

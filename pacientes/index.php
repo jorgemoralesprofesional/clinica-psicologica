@@ -2,6 +2,9 @@
 $root_path = '../';
 require_once __DIR__ . '/../config/conexion.php';
 
+$mensaje = $_GET['mensaje'] ?? '';
+$error   = $_GET['error'] ?? '';
+
 $lista_pacientes = $pdo->query("
     SELECT id, documento_identidad, nombre, correo, telefono, 
            TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad 
@@ -12,7 +15,6 @@ $pacientes = $lista_pacientes->fetchAll();
 
 $title = 'Pacientes - Clínica Psicológica';
 require_once __DIR__ . '/../includes/header.php';
-
 ?>
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -52,14 +54,18 @@ require_once __DIR__ . '/../includes/header.php';
                             <td class="p-4"><?= htmlspecialchars($paciente['edad']) ?> años</td>
                             <td class="p-4 text-center space-x-2">
                                 <a href="editar.php?id=<?= $paciente['id'] ?>" class="text-amber-600 hover:text-amber-800 font-medium text-xs bg-amber-50 px-2 py-1 rounded">Editar</a>
-                                <a href="eliminar.php?id=<?= $paciente['id'] ?>" onclick="return confirm('¿Eliminar registro?')" class="text-rose-600 hover:text-rose-800 font-medium text-xs bg-rose-50 px-2 py-1 rounded">Eliminar</a>
+                                <button type="button" 
+                                        onclick="confirmarEliminacion('eliminar.php?id=<?= $paciente['id'] ?>', '<?= htmlspecialchars($paciente['nombre']) ?>')" 
+                                        class="text-rose-600 hover:text-rose-800 font-medium text-xs bg-rose-50 px-2 py-1 rounded">
+                                    Eliminar
+                                </button>
                             </td>
                         </tr>
                     <?php endforeach; ?>
 
                     <?php if (empty($pacientes)): ?>
                         <tr>
-                            <td colspan="5" class="p-8 text-center text-slate-400">No hay psicólogos registrados.</td>
+                            <td colspan="4" class="p-8 text-center text-slate-400">No hay pacientes registrados.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
@@ -68,3 +74,52 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 
 </div>
+
+<script>
+// Función reusable para confirmación de eliminación con SweetAlert2
+function confirmarEliminacion(urlEliminar, nombreRegistro) {
+    Swal.fire({
+        title: '¿Estás seguro?',
+        text: `Vas a eliminar a "${nombreRegistro}". Esta acción no se puede deshacer.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            popup: 'rounded-xl shadow-xl border border-slate-100'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = urlEliminar;
+        }
+    });
+}
+
+// Alertas flotantes (Toast) para respuestas del servidor (mensajes de éxito / error)
+document.addEventListener('DOMContentLoaded', function() {
+    <?php if (!empty($mensaje)): ?>
+        Swal.fire({
+            icon: 'success',
+            title: '¡Operación Exitosa!',
+            text: '<?= htmlspecialchars($mensaje) ?>',
+            timer: 3000,
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
+        });
+    <?php endif; ?>
+
+    <?php if (!empty($error)): ?>
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: '<?= htmlspecialchars($error) ?>',
+            confirmButtonColor: '#2563eb'
+        });
+    <?php endif; ?>
+});
+</script>
+
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>

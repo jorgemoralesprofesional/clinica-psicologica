@@ -2,8 +2,10 @@
 session_start();
 require_once __DIR__ . '/config/conexion.php';
 
-$error = '';
+$error = $_GET['error'] ?? '';
+$mensaje = $_GET['mensaje'] ?? '';
 
+// Si ya existe una sesión activa, redirigir al panel principal
 if (isset($_SESSION['usuario_id'])) {
     header('Location: index.php');
     exit;
@@ -17,17 +19,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Por favor ingresa correo y contraseña.';
     } else {
         try {
-            // Seleccionamos la columna password_hash
-            $stmt = $pdo->prepare("SELECT id, nombre, password_hash FROM usuarios WHERE correo = ?");
+            // Consultar datos clave del usuario (incluyendo rol, estado y contraseña)
+            $stmt = $pdo->prepare("SELECT id, nombre, correo, password_hash, rol, estado FROM usuarios WHERE correo = ?");
             $stmt->execute([$correo]);
             $usuario = $stmt->fetch();
 
-            // Verificamos el hash con password_verify
+            // Verificar la existencia del usuario y validar el hash de la contraseña
             if ($usuario && password_verify($password, $usuario['password_hash'])) {
-                $_SESSION['usuario_id']     = $usuario['id'];
-                $_SESSION['usuario_nombre'] = $usuario['nombre'];
-                header('Location: index.php');
-                exit;
+                
+                // Verificar si la cuenta está bloqueada
+                if (isset($usuario['estado']) && $usuario['estado'] === 'bloqueado') {
+                    $error = 'Tu cuenta se encuentra bloqueada. Contacta al administrador.';
+                } else {
+                    
+                    // Regenerar ID de sesión por seguridad
+                    session_regenerate_id(true);
+                    $nuevo_session_id = session_id();
+
+                    // Guardar el nuevo session_id en la Base de Datos (Sesión Única)
+                    $stmt_sess = $pdo->prepare("UPDATE usuarios SET session_id = ? WHERE id = ?");
+                    $stmt_sess->execute([$nuevo_session_id, $usuario['id']]);
+
+                    // Iniciar variables de sesión
+                    $_SESSION['usuario_id']     = $usuario['id'];
+                    $_SESSION['usuario_nombre'] = $usuario['nombre'];
+                    $_SESSION['usuario_correo'] = $usuario['correo'];
+                    $_SESSION['usuario_rol']    = $usuario['rol'] ?? 'recepcionista';
+                    $_SESSION['session_id']     = $nuevo_session_id;
+
+                    header('Location: index.php');
+                    exit;
+                }
             } else {
                 $error = 'Credenciales incorrectas.';
             }
@@ -45,12 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Iniciar Sesión - Clínica Psicológica</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-100 flex items-center justify-center min-h-screen">
-    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border border-slate-200">
         <div class="text-center mb-6">
-            <span class="text-4xl">🩺</span>
-            <h1 class="text-2xl font-bold text-slate-800 mt-2">Acceso al Sistema</h1>
-            <p class="text-slate-500 text-sm">Clínica Psicológica</p>
+            <h1 class="text-2xl font-bold text-slate-800">Acceso al Sistema</h1>
+            <p class="text-slate-500 text-sm mt-1">Clínica Psicológica</p>
         </div>
 
         <?php if (!empty($error)): ?>
@@ -59,18 +80,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         <?php endif; ?>
 
+        <?php if (!empty($mensaje)): ?>
+            <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg mb-4 text-sm">
+                <?= htmlspecialchars($mensaje) ?>
+            </div>
+        <?php endif; ?>
+
         <form action="login.php" method="POST" class="space-y-4">
             <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">Correo Electrónico</label>
-                <input type="email" name="correo" required placeholder="admin@clinica.com"
-                    class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <label for="correo" class="block text-sm font-semibold text-slate-700 mb-1">Correo Electrónico</label>
+                <input type="email" id="correo" name="correo" required placeholder="admin@clinica.com"
+                       value="<?= htmlspecialchars($_POST['correo'] ?? '') ?>"
+                       class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
+
             <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">Contraseña</label>
-                <input type="password" name="password" required placeholder="••••••••"
-                    class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="flex items-center justify-between mb-1">
+                    <label for="password" class="block text-sm font-semibold text-slate-700">Contraseña</label>
+                    <a href="recuperar_password.php" class="text-xs text-blue-600 hover:underline">¿Olvidaste tu contraseña?</a>
+                </div>
+                <input type="password" id="password" name="password" required placeholder="••••••••"
+                       class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg shadow transition-colors">
+
+            <button type="submit" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg shadow transition-colors text-sm">
                 Ingresar
             </button>
         </form>

@@ -2,8 +2,10 @@
 $root_path = '../'; 
 require_once __DIR__ . '/../config/conexion.php';
 
+$mensaje = $_GET['mensaje'] ?? '';
+$error   = $_GET['error'] ?? '';
+
 try {
-    // Consulta SQL con LEFT JOIN para traer el nombre de la especialidad asociada
     $sql = "SELECT 
                 p.id, 
                 p.nombre, 
@@ -41,12 +43,6 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
     </div>
 
-    <?php if (isset($error)): ?>
-        <div class="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl mb-6 text-sm">
-            <?= htmlspecialchars($error) ?>
-        </div>
-    <?php endif; ?>
-
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
@@ -71,7 +67,11 @@ require_once __DIR__ . '/../includes/header.php';
                             <td class="p-4"><?= htmlspecialchars($psicologo['telefono']) ?></td>
                             <td class="p-4 text-center space-x-2">
                                 <a href="editar.php?id=<?= $psicologo['id'] ?>" class="text-amber-600 hover:text-amber-800 font-medium text-xs bg-amber-50 px-2 py-1 rounded">Editar</a>
-                                <a href="eliminar.php?id=<?= $psicologo['id'] ?>" onclick="return confirm('¿Eliminar registro?')" class="text-rose-600 hover:text-rose-800 font-medium text-xs bg-rose-50 px-2 py-1 rounded">Eliminar</a>
+                                <button type="button" 
+                                        onclick="confirmarEliminacion('eliminar.php?id=<?= $psicologo['id'] ?>', '<?= htmlspecialchars($psicologo['nombre']) ?>')" 
+                                        class="text-rose-600 hover:text-rose-800 font-medium text-xs bg-rose-50 px-2 py-1 rounded">
+                                    Eliminar
+                                </button>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -86,5 +86,52 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 
 </div>
+
+<script>
+// Función reusable para confirmación de eliminación con SweetAlert2
+function confirmarEliminacion(urlEliminar, nombreRegistro) {
+    Swal.fire({
+        title: '¿Estás seguro?',
+        text: `Vas a eliminar a "${nombreRegistro}". Esta acción no se puede deshacer.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            popup: 'rounded-xl shadow-xl border border-slate-100'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = urlEliminar;
+        }
+    });
+}
+
+// Alertas flotantes (Toast) para respuestas del servidor (mensajes de éxito / error)
+document.addEventListener('DOMContentLoaded', function() {
+    <?php if (!empty($mensaje)): ?>
+        Swal.fire({
+            icon: 'success',
+            title: '¡Operación Exitosa!',
+            text: '<?= htmlspecialchars($mensaje) ?>',
+            timer: 3000,
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
+        });
+    <?php endif; ?>
+
+    <?php if (!empty($error)): ?>
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: '<?= htmlspecialchars($error) ?>',
+            confirmButtonColor: '#2563eb'
+        });
+    <?php endif; ?>
+});
+</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
