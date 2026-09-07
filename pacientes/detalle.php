@@ -1,5 +1,6 @@
 <?php
-$root_path = '../../';
+$root_path = '../'; // Define que la raíz está un nivel arriba
+require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/conexion.php';
 
 // Obtener el ID del paciente desde la URL

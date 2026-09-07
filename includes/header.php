@@ -1,4 +1,8 @@
 <?php
+
+// Si por alguna razón $root_path no viene definida, asignarle './' por defecto
+$root_path = $root_path ?? './';
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -44,7 +48,7 @@ $root_path = $root_path ?? './';
 
                     <!-- Enlace visible ÚNICAMENTE si es Administrador -->
                     <?php if (function_exists('esAdmin') && esAdmin()): ?>
-                        <a href="usuario/index.php" class="px-3 py-1.5 rounded-lg text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition">
+                        <a href="<?= $root_path ?>usuario/index.php" class="px-3 py-1.5 rounded-lg text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition">
                             🛡️ Usuarios del Sistema
                         </a>
                     <?php endif; ?>

@@ -7,7 +7,7 @@ require_once BASE_PATH . '/config/conexion.php';
 
 // 1. Datos del nuevo usuario administrador
 $nombre = 'Administrador Principal';
-$correo = 'admin@gmail.com';
+$correo = 'jorgemorales270504@gmail.com';
 $password_plana = 'Admin2026.#*'; // Clave robusta con mayúsculas, minúsculas, números y símbolos
 $rol = 'admin';                 // Rol del sistema ('admin' o 'recepcionista')
 $estado = 'activo';             // Estado inicial ('activo' o 'bloqueado')

@@ -2,7 +2,8 @@
 session_start();
 require_once __DIR__ . '/config/conexion.php';
 
-$error = '';
+$error = $_GET['error'] ?? '';
+$mensaje = $_GET['mensaje'] ?? '';
 
 // Si ya existe una sesión activa, redirigir al panel principal
 if (isset($_SESSION['usuario_id'])) {
@@ -18,8 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Por favor ingresa correo y contraseña.';
     } else {
         try {
-            // Consultar datos clave del usuario (incluyendo rol y estado)
-            $stmt = $pdo->prepare("SELECT id, nombre, password_hash, rol, estado FROM usuarios WHERE correo = ?");
+            // Consultar datos clave del usuario (incluyendo rol, estado y contraseña)
+            $stmt = $pdo->prepare("SELECT id, nombre, correo, password_hash, rol, estado FROM usuarios WHERE correo = ?");
             $stmt->execute([$correo]);
             $usuario = $stmt->fetch();
 
@@ -30,10 +31,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (isset($usuario['estado']) && $usuario['estado'] === 'bloqueado') {
                     $error = 'Tu cuenta se encuentra bloqueada. Contacta al administrador.';
                 } else {
+                    
+                    // Regenerar ID de sesión por seguridad
+                    session_regenerate_id(true);
+                    $nuevo_session_id = session_id();
+
+                    // Guardar el nuevo session_id en la Base de Datos (Sesión Única)
+                    $stmt_sess = $pdo->prepare("UPDATE usuarios SET session_id = ? WHERE id = ?");
+                    $stmt_sess->execute([$nuevo_session_id, $usuario['id']]);
+
                     // Iniciar variables de sesión
                     $_SESSION['usuario_id']     = $usuario['id'];
                     $_SESSION['usuario_nombre'] = $usuario['nombre'];
+                    $_SESSION['usuario_correo'] = $usuario['correo'];
                     $_SESSION['usuario_rol']    = $usuario['rol'] ?? 'recepcionista';
+                    $_SESSION['session_id']     = $nuevo_session_id;
 
                     header('Location: index.php');
                     exit;
@@ -68,6 +80,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         <?php endif; ?>
 
+        <?php if (!empty($mensaje)): ?>
+            <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg mb-4 text-sm">
+                <?= htmlspecialchars($mensaje) ?>
+            </div>
+        <?php endif; ?>
+
         <form action="login.php" method="POST" class="space-y-4">
             <div>
                 <label for="correo" class="block text-sm font-semibold text-slate-700 mb-1">Correo Electrónico</label>
@@ -77,7 +95,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <div>
-                <label for="password" class="block text-sm font-semibold text-slate-700 mb-1">Contraseña</label>
+                <div class="flex items-center justify-between mb-1">
+                    <label for="password" class="block text-sm font-semibold text-slate-700">Contraseña</label>
+                    <a href="recuperar_password.php" class="text-xs text-blue-600 hover:underline">¿Olvidaste tu contraseña?</a>
+                </div>
                 <input type="password" id="password" name="password" required placeholder="••••••••"
                        class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
