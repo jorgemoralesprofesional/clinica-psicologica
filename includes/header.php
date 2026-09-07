@@ -7,16 +7,18 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/auth.php';
 
 // Ajusta la ruta relativa al directorio raíz según sea necesario
-$root_path = $root_path ?? './'; 
+$root_path = $root_path ?? './';
 ?>
 <!DOCTYPE html>
 <html lang="es" class="h-full bg-slate-100">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? 'Clínica Psicológica' ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="h-full flex flex-col bg-slate-100 font-sans text-slate-800">
 
     <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
@@ -39,6 +41,13 @@ $root_path = $root_path ?? './';
                     <a href="<?= $root_path ?>psicologos/index.php" class="text-slate-600 hover:text-blue-600 transition-colors">
                         Psicólogos
                     </a>
+
+                    <!-- Enlace visible ÚNICAMENTE si es Administrador -->
+                    <?php if (function_exists('esAdmin') && esAdmin()): ?>
+                        <a href="usuario/index.php" class="px-3 py-1.5 rounded-lg text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition">
+                            🛡️ Usuarios del Sistema
+                        </a>
+                    <?php endif; ?>
                 </nav>
 
                 <div class="flex items-center gap-4">
