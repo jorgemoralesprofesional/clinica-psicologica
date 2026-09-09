@@ -63,6 +63,7 @@ require_once __DIR__ . '/../includes/header.php';
     <?php if ($error): ?><div class="bg-rose-50 text-rose-700 px-4 py-3 rounded-lg mb-4 text-sm"><?= $error ?></div><?php endif; ?>
 
     <form method="POST" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
         <div>
             <label for="documento_identidad" class="block text-sm font-semibold text-slate-700 mb-1">Cédula / Documento de Identidad</label>
             <input type="text" id="documento_identidad" name="documento_identidad" value="<?= htmlspecialchars($paciente['documento_identidad']) ?>" required
