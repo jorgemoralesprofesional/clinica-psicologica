@@ -21,17 +21,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $telefono            = trim($_POST['telefono'] ?? '');
     $fecha_nacimiento    = trim($_POST['fecha_nacimiento'] ?? '');
 
-    if (empty($documento_identidad) || empty($nombre) || empty($fecha_nacimiento) || empty($correo) || empty($telefono)) {
-        $error = 'Por favor completa todos los campos.';
-    } else {
-        try {
-            // CORREGIDO: Apunta a la tabla 'pacientes'
-            $query_actualizar = $pdo->prepare("UPDATE pacientes SET documento_identidad = ?, nombre = ?, correo = ?, telefono = ?, fecha_nacimiento = ? WHERE id = ?");
-            $query_actualizar->execute([$documento_identidad, $nombre, $correo, $telefono, $fecha_nacimiento, $id]);
-            
-            $mensaje = '✅ Paciente actualizado con éxito.';
-        } catch (PDOException $e) {
-            $error = 'Error en la base de datos: ' . $e->getMessage();
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            $error = 'Error de seguridad: Solicitud no autorizada (CSRF inválido).';
+        } else {
+            try {
+                // CORREGIDO: Apunta a la tabla 'pacientes'
+                $query_actualizar = $pdo->prepare("UPDATE pacientes SET documento_identidad = ?, nombre = ?, correo = ?, telefono = ?, fecha_nacimiento = ? WHERE id = ?");
+                $query_actualizar->execute([$documento_identidad, $nombre, $correo, $telefono, $fecha_nacimiento, $id]);
+
+                $mensaje = '✅ Paciente actualizado con éxito.';
+            } catch (PDOException $e) {
+                $error = 'Error en la base de datos: ' . $e->getMessage();
+            }
         }
     }
 }
@@ -91,7 +93,7 @@ require_once __DIR__ . '/../includes/header.php';
                 class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
 
-        <button type="submit" 
+        <button type="submit"
             class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg shadow transition-all">
             Actualizar Paciente
         </button>

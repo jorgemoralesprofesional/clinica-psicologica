@@ -17,6 +17,12 @@ function esPasswordRobusta($password) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        $error = 'Error de seguridad: Solicitud no autorizada (CSRF inválido).';
+    } else {
+
     $nombre         = trim($_POST['nombre'] ?? '');
     $correo         = trim($_POST['correo'] ?? '');
     $password_plana = $_POST['password'] ?? '';
@@ -57,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: crear.php?error=" . urlencode($error));
         exit;
     }
+    }
 }
 
 $error = $_GET['error'] ?? '';
@@ -77,6 +84,8 @@ require_once __DIR__ . '/../includes/header.php';
     <?php endif; ?>
 
     <form action="crear.php" method="POST" class="space-y-4">
+
+        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
         <div>
             <label for="nombre" class="block text-sm font-semibold text-slate-700 mb-1">Nombre Completo *</label>
             <input type="text" id="nombre" name="nombre" required placeholder="Ej: Juan Pérez"
