@@ -5,14 +5,20 @@ require_once __DIR__ . '/config/conexion.php';
 // Actualizar automáticamente a 'realizada' las citas pendientes cuya fecha y hora ya pasaron
 // (Solo si la fecha es menor estrictamente o se desea actualizar de forma controlada)
 try {
+    // Guardamos la hora exacta en una variable para asegurar consistencia
+    $ahora = date('Y-m-d H:i:s');
+
+    // Usamos TIMESTAMP nativo de MySQL en lugar de CONCAT como texto
     $sql_auto_realizada = "UPDATE citas 
                            SET estado = 'realizada' 
                            WHERE estado = 'pendiente' 
-                           AND CONCAT(fecha, ' ', hora_inicio) <= :ahora";
+                           AND TIMESTAMP(fecha, hora_inicio) <= :ahora";
+
     $stmt_auto = $pdo->prepare($sql_auto_realizada);
-    $stmt_auto->execute([':ahora' => date('Y-m-d H:i:s')]);
+    $stmt_auto->execute([':ahora' => $ahora]);
 } catch (PDOException $e) {
-    // Manejo de errores
+    // Si la base de datos rechaza la consulta, ahora sí verás el error en pantalla
+    die("Error crítico al actualizar las citas: " . $e->getMessage());
 }
 
 // Contadores simples para el Dashboard

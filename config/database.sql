@@ -1,6 +1,6 @@
 -- Creación de la base de datos
-CREATE DATABASE IF NOT EXISTS clinica_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE clinica_db;
+//*CREATE DATABASE IF NOT EXISTS clinica_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE clinica_db;*//
 
 -- 1. Tabla de Usuarios (Recepcionistas / Administradores)
 CREATE TABLE IF NOT EXISTS usuarios (

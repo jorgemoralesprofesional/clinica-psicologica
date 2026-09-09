@@ -3,6 +3,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Generar token CSRF global si no existe
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Verificar autenticación básica
 if (!isset($_SESSION['usuario_id']) || empty($_SESSION['usuario_id'])) {
     header('Location: ' . ($root_path ?? './') . 'login.php');
@@ -29,7 +34,8 @@ if (!$user_db || $user_db['session_id'] !== $session_id_actual) {
 
 // Función auxiliar para verificar si es admin
 if (!function_exists('esAdmin')) {
-    function esAdmin() {
+    function esAdmin()
+    {
         if (!isset($_SESSION['usuario_rol'])) {
             return false;
         }

@@ -11,34 +11,43 @@ if (!esAdmin()) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nombre = trim($_POST['nombre'] ?? '');
-    $correo = trim($_POST['correo'] ?? '');
-    $password = trim($_POST['password'] ?? '');
-    $rol = $_POST['rol'] ?? 'recepcionista';
-
-    // Validación de contraseña robusta
-    $patron = '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\.\#\*\@\$\!\%\_\-]).{8,}$/';
-
-    if (empty($nombre) || empty($correo) || empty($password)) {
-        $error = 'Todos los campos son obligatorios.';
-    } elseif (!preg_match($patron, $password)) {
-        $error = 'La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula, un número y un símbolo (., #, *).';
+    // Validar token CSRF
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'] ?? '', $_POST['csrf_token'])) {
+        $error = 'Error de seguridad: Solicitud no autorizada (CSRF inválido).';
     } else {
-        try {
-            $stmtCheck = $pdo->prepare("SELECT id FROM usuarios WHERE correo = ?");
-            $stmtCheck->execute([$correo]);
-            if ($stmtCheck->fetch()) {
-                $error = 'El correo electrónico ya se encuentra registrado.';
-            } else {
-                $password_hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $pdo->prepare("INSERT INTO usuarios (nombre, correo, password_hash, rol, estado) VALUES (?, ?, ?, ?, 'activo')");
-                $stmt->execute([$nombre, $correo, $password_hash, $rol]);
+        $nombre   = trim($_POST['nombre'] ?? '');
+        $correo   = trim($_POST['correo'] ?? '');
+        $password = trim($_POST['password'] ?? '');
+        $rol      = $_POST['rol'] ?? 'recepcionista';
 
-                header('Location: index.php');
-                exit;
+        // Validación de contraseña robusta (Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 símbolo)
+        $patron = '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\.\#\*\@\$\!\%\_\-]).{8,}$/';
+
+        if (empty($nombre) || empty($correo) || empty($password)) {
+            $error = 'Todos los campos son obligatorios.';
+        } elseif (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+            $error = 'El formato del correo electrónico no es válido.';
+        } elseif (!preg_match($patron, $password)) {
+            $error = 'La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula, un número y un símbolo (., #, *, @, $, !, %, _, -).';
+        } else {
+            try {
+                // Verificar si el correo electrónico ya existe
+                $stmtCheck = $pdo->prepare("SELECT id FROM usuarios WHERE correo = ?");
+                $stmtCheck->execute([$correo]);
+
+                if ($stmtCheck->fetch()) {
+                    $error = 'El correo electrónico ya se encuentra registrado.';
+                } else {
+                    $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                    $stmt = $pdo->prepare("INSERT INTO usuarios (nombre, correo, password_hash, rol, estado) VALUES (?, ?, ?, ?, 'activo')");
+                    $stmt->execute([$nombre, $correo, $password_hash, $rol]);
+
+                    header('Location: index.php?mensaje=' . urlencode('Usuario registrado exitosamente.'));
+                    exit;
+                }
+            } catch (PDOException $e) {
+                $error = 'Error al registrar el usuario: ' . $e->getMessage();
             }
-        } catch (PDOException $e) {
-            $error = 'Error al registrar el usuario: ' . $e->getMessage();
         }
     }
 }
@@ -60,6 +69,7 @@ require_once __DIR__ . '/../includes/header.php';
     <?php endif; ?>
 
     <form action="crear.php" method="POST" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Nombre Completo *</label>
             <input type="text" name="nombre" required value="<?= htmlspecialchars($_POST['nombre'] ?? '') ?>" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
